@@ -1,0 +1,965 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#0f1f3d" />
+<title>Equipamentos · Mais Soluções Industriais</title>
+
+<!-- Ícones e PWA -->
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Equipamentos" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<!--
+================================================================================
+  CONTROLE DE EQUIPAMENTOS DE DEMONSTRAÇÃO · Mais Soluções Industriais
+  HTML + Google Sheets (via Apps Script) · sem login · e-mail automático
+================================================================================
+
+  PASSO A PASSO DE CONFIGURAÇÃO (~10 minutos, faça UMA vez)
+
+  1) Crie uma planilha Google Sheets com TRÊS abas (nomes exatos):
+
+     - "Equipamentos"   → cabeçalho na linha 1:
+        ID | Nome | Código | Status | Data Retirada | Data Devolução | Projeto/Oportunidade | Observações | Atualizado em
+
+     - "Solicitações"   → cabeçalho na linha 1:
+        ID | Data Solicitação | ID Equipamento | Equipamento | Código | Solicitante | E-mail Solicitante | Data Retirada | Data Devolução | Projeto/Oportunidade | Observações | Status | Aprovado em
+
+     - "Config"         → cabeçalho na linha 1:
+        Chave | Valor
+
+       Em seguida adicione as linhas (coluna A = chave, coluna B = valor):
+        adminWhatsapp     | 5531999998888
+        empresa           | Mais Soluções Industriais
+
+       NOTA: o e-mail de aprovação está travado no código do Apps Script
+       como eduardo@maisindustrial.com.br. Para alterar, edite a constante
+       ADMIN_EMAIL no arquivo apps-script-equipamentos.gs.
+
+  2) Na mesma planilha: Extensões → Apps Script.
+     Apague o conteúdo padrão e cole TODO o conteúdo do arquivo
+     "apps-script-equipamentos.gs" (entregue junto com este HTML).
+     Salve (Ctrl+S).
+
+  3) No Apps Script: clique em Implantar → Nova implantação
+     - Tipo: "App da Web"
+     - Executar como: "Eu"
+     - Quem tem acesso: "Qualquer pessoa"
+     - Clique em Implantar e autorize quando pedido.
+
+     Copie a URL gerada (https://script.google.com/macros/s/AKfy.../exec).
+
+  4) Cole essa URL abaixo, no lugar de COLE_URL_APPS_SCRIPT_AQUI
+     (procure por APPS_SCRIPT_URL no código JavaScript desta página).
+
+  5) Hospede este index.html no GitHub Pages, Netlify, ou qualquer servidor
+     estático. Pronto — qualquer pessoa com o link poderá acessar.
+
+  IMPORTANTE: na primeira vez que o Apps Script rodar, o Google vai pedir
+  autorização (ele precisa para acessar a planilha e enviar e-mails em seu
+  nome). Aceite os avisos.
+
+================================================================================
+-->
+
+<style>
+  :root {
+    --ink: #0f1f3d;       /* azul Mais Soluções */
+    --ink-2: #1c3866;
+    --paper: #fbfaf7;
+    --paper-2: #f1ede4;
+    --rule: #e2dccd;
+    --muted: #6b6558;
+    --accent: #d4842c;    /* laranja industrial — acento */
+    --ok: #2f6f4e;
+    --warn: #b07d2a;
+    --danger: #a83232;
+    --info: #2c5d8a;
+    --shadow: 0 1px 0 rgba(15,31,61,.04), 0 8px 24px -12px rgba(15,31,61,.18);
+    --radius: 6px;
+    --radius-lg: 10px;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter Tight', system-ui, sans-serif;
+    background: var(--paper); color: var(--ink);
+    font-size: 15px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    min-height: 100dvh;
+  }
+  .display {
+    font-family: 'Fraunces', Georgia, serif;
+    font-optical-sizing: auto;
+    font-variation-settings: "opsz" 96;
+    letter-spacing: -0.02em; line-height: 1.05;
+  }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; border: none; background: none; }
+  a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+
+  /* ========== TOPBAR ========== */
+  .topbar {
+    background: var(--ink); color: var(--paper);
+    padding: 18px 24px;
+    border-bottom: 4px solid var(--accent);
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    flex-wrap: wrap;
+  }
+  .brand { display: flex; flex-direction: column; gap: 2px; }
+  .brand .name {
+    font-family: 'Fraunces', serif; font-weight: 500; font-size: 22px;
+    letter-spacing: -0.02em; color: var(--paper);
+  }
+  .brand .name em { color: var(--accent); font-style: italic; font-weight: 600; }
+  .brand .sub {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.18em;
+    color: rgba(251,250,247,.6); font-weight: 500;
+  }
+  .nav { display: flex; gap: 2px; }
+  .nav button {
+    padding: 8px 14px; border-radius: var(--radius);
+    font-size: 13px; font-weight: 500;
+    color: rgba(251,250,247,.65);
+    transition: all .15s;
+  }
+  .nav button:hover { color: var(--paper); background: rgba(255,255,255,.06); }
+  .nav button.active { color: var(--ink); background: var(--paper); }
+
+  .main { padding: 36px 24px 80px; max-width: 1320px; margin: 0 auto; }
+
+  /* ========== HEADER ========== */
+  .pageheader {
+    display: flex; align-items: end; justify-content: space-between;
+    gap: 24px; margin-bottom: 28px; flex-wrap: wrap;
+  }
+  .pageheader h2 {
+    font-family: 'Fraunces', serif; font-weight: 500;
+    font-size: clamp(28px, 4vw, 42px); line-height: 1;
+    letter-spacing: -0.02em; margin: 0;
+  }
+  .pageheader .sub {
+    color: var(--muted); font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.14em; margin-bottom: 10px; font-weight: 500;
+  }
+
+  /* ========== STATS / DASHBOARD ========== */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 28px; }
+  .stat {
+    background: var(--paper); border: 1px solid var(--rule);
+    border-radius: var(--radius-lg); padding: 18px 20px;
+    position: relative; overflow: hidden;
+  }
+  .stat::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: var(--ink);
+  }
+  .stat.ok::before { background: var(--ok); }
+  .stat.warn::before { background: var(--warn); }
+  .stat.info::before { background: var(--info); }
+  .stat.danger::before { background: var(--danger); }
+  .stat.accent::before { background: var(--accent); }
+  .stat .n {
+    font-family: 'Fraunces', serif; font-size: 36px; line-height: 1;
+    font-weight: 500; letter-spacing: -0.02em;
+  }
+  .stat .l {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em;
+    color: var(--muted); margin-top: 8px; font-weight: 500;
+  }
+
+  .dashboard-grid {
+    display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; margin-bottom: 28px;
+  }
+  @media (max-width: 880px) { .dashboard-grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--paper); border: 1px solid var(--rule);
+    border-radius: var(--radius-lg); padding: 22px 24px;
+    box-shadow: var(--shadow);
+  }
+  .card h3 {
+    font-family: 'Fraunces', serif; font-weight: 500; font-size: 18px;
+    letter-spacing: -0.01em; margin: 0 0 14px;
+  }
+  .card .sub {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em;
+    color: var(--muted); margin-bottom: 16px; font-weight: 500;
+  }
+
+  /* Status bars */
+  .bars { display: flex; flex-direction: column; gap: 10px; }
+  .bar-row { display: grid; grid-template-columns: 130px 1fr 40px; gap: 10px; align-items: center; }
+  .bar-label { font-size: 12px; font-weight: 500; }
+  .bar-track { height: 8px; background: var(--paper-2); border-radius: 100px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 100px; transition: width .5s ease; }
+  .bar-num { font-family: 'JetBrains Mono', monospace; font-size: 12px; text-align: right; color: var(--muted); }
+
+  /* Recent list */
+  .recent { display: flex; flex-direction: column; gap: 10px; }
+  .recent-item {
+    display: flex; justify-content: space-between; align-items: start;
+    gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--rule);
+  }
+  .recent-item:last-child { border-bottom: none; }
+  .recent-item .who { font-weight: 500; font-size: 13px; }
+  .recent-item .what { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .recent-item .when { font-size: 11px; color: var(--muted); white-space: nowrap; font-family: 'JetBrains Mono', monospace; }
+
+  /* ========== TOOLBAR ========== */
+  .toolbar {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 18px; align-items: center;
+  }
+  .input, .select {
+    background: var(--paper); border: 1px solid var(--rule);
+    border-radius: var(--radius); padding: 9px 12px; font-size: 13px;
+    transition: border-color .12s;
+  }
+  .input:focus, .select:focus { outline: none; border-color: var(--ink); }
+  .input.search { min-width: 240px; }
+  .btn {
+    background: var(--ink); color: var(--paper);
+    padding: 10px 16px; border-radius: var(--radius);
+    font-weight: 500; font-size: 13px; transition: all .15s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { background: var(--ink-2); }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.primary:hover { background: #b86d1e; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--rule); }
+  .btn.ghost:hover { border-color: var(--ink); background: var(--paper-2); }
+  .btn.sm { padding: 6px 11px; font-size: 12px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .spacer { flex: 1; }
+
+  /* ========== TABLE ========== */
+  .table-wrap {
+    background: var(--paper); border: 1px solid var(--rule);
+    border-radius: var(--radius-lg); overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left; font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.14em; color: var(--muted); font-weight: 600;
+    padding: 14px 16px; border-bottom: 1px solid var(--rule);
+    background: var(--paper-2); white-space: nowrap;
+  }
+  tbody td {
+    padding: 14px 16px; font-size: 14px;
+    border-bottom: 1px solid var(--rule); vertical-align: middle;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr { transition: background .1s; }
+  tbody tr:hover { background: var(--paper-2); }
+  td.code { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); }
+  td.actions { text-align: right; white-space: nowrap; }
+  td.actions .btn { margin-left: 6px; }
+
+  .empty {
+    padding: 56px 20px; text-align: center; color: var(--muted); font-size: 14px;
+  }
+  .empty .display { font-size: 22px; color: var(--ink); margin-bottom: 8px; display: block; }
+
+  /* ========== STATUS PILLS ========== */
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    font-weight: 600; padding: 4px 10px; border-radius: 100px;
+    border: 1px solid var(--rule); white-space: nowrap;
+  }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.disponivel  { color: var(--ok);     background: rgba(47,111,78,.06);  border-color: rgba(47,111,78,.2); }
+  .pill.emprestado  { color: var(--info);   background: rgba(44,93,138,.06);  border-color: rgba(44,93,138,.2); }
+  .pill.demonstracao{ color: var(--accent); background: rgba(212,132,44,.08); border-color: rgba(212,132,44,.3); }
+  .pill.manutencao  { color: var(--warn);   background: rgba(176,125,42,.06); border-color: rgba(176,125,42,.2); }
+  .pill.danificado  { color: var(--danger); background: rgba(168,50,50,.06);  border-color: rgba(168,50,50,.2); }
+  .pill.pendente    { color: var(--accent); background: rgba(212,132,44,.08); border-color: rgba(212,132,44,.3); }
+  .pill.aprovado    { color: var(--ok);     background: rgba(47,111,78,.06);  border-color: rgba(47,111,78,.2); }
+  .pill.recusado    { color: var(--danger); background: rgba(168,50,50,.06);  border-color: rgba(168,50,50,.2); }
+
+  /* ========== MODAL ========== */
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(15,31,61,.45);
+    backdrop-filter: blur(4px);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100; padding: 20px;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: var(--paper); border-radius: var(--radius-lg);
+    max-width: 580px; width: 100%; max-height: 92dvh; overflow-y: auto;
+    border: 1px solid var(--rule);
+    box-shadow: 0 30px 60px -20px rgba(15,31,61,.4);
+  }
+  .modal header {
+    display: flex; justify-content: space-between; align-items: start;
+    padding: 24px 28px 12px;
+  }
+  .modal h3 {
+    font-family: 'Fraunces', serif; font-size: 24px; font-weight: 500;
+    letter-spacing: -0.02em; margin: 0;
+  }
+  .modal .x {
+    width: 32px; height: 32px; border-radius: var(--radius);
+    color: var(--muted); font-size: 20px;
+    display: grid; place-items: center; transition: background .15s;
+  }
+  .modal .x:hover { background: var(--paper-2); color: var(--ink); }
+  .modal .body { padding: 8px 28px 24px; }
+  .modal .footer {
+    padding: 16px 28px; border-top: 1px solid var(--rule);
+    display: flex; gap: 10px; justify-content: flex-end;
+    background: var(--paper-2);
+    border-bottom-left-radius: var(--radius-lg);
+    border-bottom-right-radius: var(--radius-lg);
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .field label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em;
+    color: var(--muted); font-weight: 600;
+  }
+  .field label .req { color: var(--accent); }
+  .field input, .field select, .field textarea {
+    background: var(--paper); border: 1px solid var(--rule);
+    border-radius: var(--radius); padding: 10px 12px; font-size: 14px;
+    font-family: inherit;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none; border-color: var(--ink);
+  }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 540px) { .field-row { grid-template-columns: 1fr; } }
+
+  /* ========== TOAST ========== */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--ink); color: var(--paper);
+    padding: 12px 20px; border-radius: var(--radius);
+    font-size: 13px; font-weight: 500;
+    box-shadow: 0 10px 30px -10px rgba(0,0,0,.3);
+    transition: transform .25s ease;
+    z-index: 200; max-width: 90vw;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.error { background: var(--danger); }
+  .toast.success { background: var(--ok); }
+
+  .loader { display: inline-block; width: 14px; height: 14px;
+    border: 2px solid currentColor; border-top-color: transparent;
+    border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .center-loader { min-height: 50vh; display: grid; place-items: center; color: var(--muted); }
+
+  /* ========== RESPONSIVE TABLE → CARDS ========== */
+  @media (max-width: 760px) {
+    .topbar { padding: 14px 16px; }
+    .nav { order: 3; flex-basis: 100%; overflow-x: auto; padding-bottom: 4px; }
+    .main { padding: 24px 14px 60px; }
+    thead { display: none; }
+    tbody td { display: block; padding: 6px 16px; border: none; }
+    tbody tr {
+      display: block; padding: 14px 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    tbody td::before {
+      content: attr(data-label);
+      display: block; font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.14em; color: var(--muted); font-weight: 600;
+      margin-bottom: 2px;
+    }
+    td.actions { text-align: left; padding-top: 10px; }
+    td.actions .btn { margin: 4px 6px 0 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="name">Mais <em>Soluções</em> Industriais</span>
+    <span class="sub">Controle de Equipamentos · Demo & Testes</span>
+  </div>
+  <nav class="nav" id="nav">
+    <button data-tab="dashboard" class="active">Dashboard</button>
+    <button data-tab="equipamentos">Equipamentos</button>
+    <button data-tab="solicitacoes">Solicitações</button>
+  </nav>
+</header>
+
+<main class="main">
+  <div id="loadingApp" class="center-loader">
+    <span class="loader"></span>&nbsp;&nbsp;Carregando dados…
+  </div>
+
+  <!-- ============ DASHBOARD ============ -->
+  <section id="tabDashboard" class="tab" style="display:none">
+    <div class="pageheader">
+      <div>
+        <div class="sub">Visão geral</div>
+        <h2 class="display">Dashboard</h2>
+      </div>
+      <div>
+        <button id="btnRefresh" class="btn ghost">↻ Atualizar</button>
+      </div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="dashboard-grid">
+      <div class="card">
+        <div class="sub">Distribuição por status</div>
+        <h3>Inventário</h3>
+        <div class="bars" id="bars"></div>
+      </div>
+      <div class="card">
+        <div class="sub">Últimas solicitações</div>
+        <h3>Movimento recente</h3>
+        <div class="recent" id="recent"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sub">Atenção</div>
+      <h3>Devoluções próximas / vencidas</h3>
+      <div id="alerts"></div>
+    </div>
+  </section>
+
+  <!-- ============ EQUIPAMENTOS ============ -->
+  <section id="tabEquipamentos" class="tab" style="display:none">
+    <div class="pageheader">
+      <div>
+        <div class="sub">Inventário</div>
+        <h2 class="display">Equipamentos</h2>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="btnNewEquip" class="btn ghost">+ Cadastrar</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <input id="filterSearch" class="input search" placeholder="Buscar por nome, código ou projeto…" />
+      <select id="filterStatus" class="select">
+        <option value="">Todos os status</option>
+        <option value="disponivel">Disponível</option>
+        <option value="emprestado">Emprestado</option>
+        <option value="demonstracao">Em demonstração</option>
+        <option value="manutencao">Em manutenção</option>
+        <option value="danificado">Danificado</option>
+      </select>
+      <span class="spacer"></span>
+      <span class="mono" id="equipCount" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Equipamento</th>
+            <th>Código</th>
+            <th>Status</th>
+            <th>Projeto / Oportunidade</th>
+            <th>Período</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="equipBody"></tbody>
+      </table>
+      <div id="equipEmpty" class="empty" style="display:none">
+        <span class="display">Nenhum equipamento cadastrado</span>
+        Use o botão "Cadastrar" para começar.
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SOLICITAÇÕES ============ -->
+  <section id="tabSolicitacoes" class="tab" style="display:none">
+    <div class="pageheader">
+      <div>
+        <div class="sub">Histórico</div>
+        <h2 class="display">Solicitações</h2>
+      </div>
+    </div>
+    <div class="toolbar">
+      <select id="filterReqStatus" class="select">
+        <option value="">Todos</option>
+        <option value="pendente">Pendentes</option>
+        <option value="aprovado">Aprovadas</option>
+        <option value="recusado">Recusadas</option>
+      </select>
+      <span class="spacer"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Equipamento</th>
+            <th>Solicitante</th>
+            <th>Período</th>
+            <th>Projeto</th>
+            <th>Status</th>
+            <th>Data</th>
+          </tr>
+        </thead>
+        <tbody id="reqBody"></tbody>
+      </table>
+      <div id="reqEmpty" class="empty" style="display:none">
+        <span class="display">Sem solicitações ainda</span>
+        As requisições aparecem aqui assim que forem criadas.
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ============ MODAL: NOVO EQUIPAMENTO ============ -->
+<div id="modalEquip" class="modal-bg">
+  <div class="modal">
+    <header>
+      <div><h3 id="equipTitle">Cadastrar equipamento</h3></div>
+      <button class="x" data-close>&times;</button>
+    </header>
+    <div class="body">
+      <div class="field">
+        <label>Nome do equipamento <span class="req">*</span></label>
+        <input id="eqName" class="input" placeholder="Ex.: Analisador de vibração XYZ-200" />
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Código <span class="req">*</span></label>
+          <input id="eqCode" class="input" placeholder="EQ-0001" />
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="eqStatus" class="select">
+            <option value="disponivel">Disponível</option>
+            <option value="emprestado">Emprestado</option>
+            <option value="demonstracao">Em demonstração</option>
+            <option value="manutencao">Em manutenção</option>
+            <option value="danificado">Danificado</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Observações</label>
+        <textarea id="eqNotes" class="input" rows="3" placeholder="Detalhes técnicos, acessórios incluídos, etc."></textarea>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:0">
+        O cadastro de equipamentos é uma ação direta — não passa por aprovação.
+        Empréstimos e demonstrações sim (vide aba Solicitações).
+      </p>
+    </div>
+    <div class="footer">
+      <button class="btn ghost" data-close>Cancelar</button>
+      <button id="btnSaveEquip" class="btn primary">Cadastrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: SOLICITAR ============ -->
+<div id="modalReq" class="modal-bg">
+  <div class="modal">
+    <header>
+      <div><h3>Solicitar equipamento</h3></div>
+      <button class="x" data-close>&times;</button>
+    </header>
+    <div class="body">
+      <div id="reqEquipInfo" style="background:var(--paper-2);padding:12px 14px;border-radius:var(--radius);margin-bottom:18px;font-size:13px"></div>
+      <div class="field-row">
+        <div class="field">
+          <label>Seu nome <span class="req">*</span></label>
+          <input id="reqName" class="input" />
+        </div>
+        <div class="field">
+          <label>Seu e-mail <span class="req">*</span></label>
+          <input id="reqEmail" class="input" type="email" />
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Data de retirada <span class="req">*</span></label>
+          <input id="reqStart" class="input" type="date" />
+        </div>
+        <div class="field">
+          <label>Data de devolução <span class="req">*</span></label>
+          <input id="reqEnd" class="input" type="date" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Tipo de uso <span class="req">*</span></label>
+        <select id="reqStatus" class="select">
+          <option value="emprestado">Empréstimo</option>
+          <option value="demonstracao">Demonstração</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Projeto / Oportunidade <span class="req">*</span></label>
+        <input id="reqProject" class="input" placeholder="Cliente, projeto ou nº de oportunidade" />
+      </div>
+      <div class="field">
+        <label>Observações</label>
+        <textarea id="reqNotes" class="input" rows="2"></textarea>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:0">
+        Sua solicitação será enviada por e-mail para aprovação. Você receberá
+        a resposta no e-mail informado acima.
+      </p>
+    </div>
+    <div class="footer">
+      <button class="btn ghost" data-close>Cancelar</button>
+      <button id="btnSendReq" class="btn primary">Enviar para aprovação</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+/* ============================================================
+   APPS_SCRIPT_URL — cole abaixo a URL da implantação Web do
+   Apps Script (passos 3-4 das instruções no topo deste arquivo).
+   ============================================================ */
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwq3JtwGiykCCjnz4d--PqY_QPiXSGeDeBkZsyscqydwkB9Vu9edY5pMN7tscp1dMFY/exec";
+
+const STATUS_LABELS = {
+  disponivel: "Disponível",
+  emprestado: "Emprestado",
+  demonstracao: "Em demonstração",
+  manutencao: "Em manutenção",
+  danificado: "Danificado"
+};
+const REQ_STATUS_LABELS = {
+  pendente: "Pendente", aprovado: "Aprovado", recusado: "Recusado"
+};
+
+let cacheEquip = [], cacheReq = [];
+let activeTab = "dashboard";
+let isConfigured = !APPS_SCRIPT_URL.startsWith("COLE_");
+
+/* ============ TABS ============ */
+document.getElementById("nav").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-tab]");
+  if (btn) switchTab(btn.dataset.tab);
+});
+function switchTab(name) {
+  activeTab = name;
+  document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+  document.querySelectorAll(".tab").forEach(t => t.style.display = "none");
+  document.getElementById("tab" + name.charAt(0).toUpperCase() + name.slice(1)).style.display = "block";
+  if (name === "dashboard") renderDashboard();
+  if (name === "equipamentos") renderEquip();
+  if (name === "solicitacoes") renderRequests();
+}
+
+/* ============ FETCH ============ */
+async function fetchData() {
+  if (!isConfigured) {
+    document.getElementById("loadingApp").innerHTML =
+      `<div style="text-align:center;max-width:520px;padding:30px">
+        <div class="display" style="font-size:24px;margin-bottom:12px">Configuração pendente</div>
+        <p style="color:var(--muted);font-size:14px">
+          Edite este arquivo HTML, cole a URL do seu Apps Script no lugar de
+          <span class="mono">COLE_URL_APPS_SCRIPT_AQUI</span> e veja as instruções
+          completas no topo do código-fonte.
+        </p>
+      </div>`;
+    return;
+  }
+  try {
+    const res = await fetch(APPS_SCRIPT_URL + "?action=list", { method: "GET" });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || "Erro desconhecido");
+    cacheEquip = json.equipamentos || [];
+    cacheReq = json.solicitacoes || [];
+    document.getElementById("loadingApp").style.display = "none";
+    switchTab(activeTab);
+  } catch (e) {
+    document.getElementById("loadingApp").innerHTML =
+      `<div style="text-align:center;color:var(--danger);max-width:480px;padding:30px">
+        <strong>Erro ao carregar dados.</strong><br/>
+        ${esc(e.message)}<br/><br/>
+        <button class="btn ghost" onclick="location.reload()">Tentar de novo</button>
+      </div>`;
+  }
+}
+async function postAction(action, payload) {
+  const res = await fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action, ...payload })
+  });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || "Erro");
+  return json;
+}
+
+document.getElementById("btnRefresh").onclick = fetchData;
+
+/* ============ DASHBOARD ============ */
+function renderDashboard() {
+  const counts = { disponivel:0, emprestado:0, demonstracao:0, manutencao:0, danificado:0 };
+  cacheEquip.forEach(e => { if (counts.hasOwnProperty(e.status)) counts[e.status]++; });
+  const total = cacheEquip.length;
+  const pend = cacheReq.filter(r => r.status === "pendente").length;
+
+  document.getElementById("stats").innerHTML = `
+    <div class="stat"><div class="n">${total}</div><div class="l">Total</div></div>
+    <div class="stat ok"><div class="n">${counts.disponivel}</div><div class="l">Disponíveis</div></div>
+    <div class="stat info"><div class="n">${counts.emprestado}</div><div class="l">Emprestados</div></div>
+    <div class="stat accent"><div class="n">${counts.demonstracao}</div><div class="l">Em demonstração</div></div>
+    <div class="stat warn"><div class="n">${counts.manutencao}</div><div class="l">Em manutenção</div></div>
+    <div class="stat danger"><div class="n">${counts.danificado}</div><div class="l">Danificados</div></div>
+    <div class="stat accent"><div class="n">${pend}</div><div class="l">Pendentes</div></div>
+  `;
+
+  // Bars
+  const colors = {
+    disponivel: "var(--ok)", emprestado: "var(--info)", demonstracao: "var(--accent)",
+    manutencao: "var(--warn)", danificado: "var(--danger)"
+  };
+  document.getElementById("bars").innerHTML = Object.keys(counts).map(k => {
+    const pct = total ? Math.round(counts[k] / total * 100) : 0;
+    return `<div class="bar-row">
+      <div class="bar-label">${STATUS_LABELS[k]}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${colors[k]}"></div></div>
+      <div class="bar-num">${counts[k]}</div>
+    </div>`;
+  }).join("");
+
+  // Recent
+  const recent = [...cacheReq].sort((a,b) => (b.dataSolicitacao||"").localeCompare(a.dataSolicitacao||"")).slice(0, 6);
+  const recentHtml = recent.length === 0
+    ? `<div style="color:var(--muted);font-size:13px">Sem movimentação ainda.</div>`
+    : recent.map(r => `
+      <div class="recent-item">
+        <div>
+          <div class="who">${esc(r.solicitante)}</div>
+          <div class="what">${esc(r.equipamento)} <span class="pill ${r.status}" style="margin-left:6px">${REQ_STATUS_LABELS[r.status]||r.status}</span></div>
+        </div>
+        <div class="when">${fmtDateTime(r.dataSolicitacao)}</div>
+      </div>`).join("");
+  document.getElementById("recent").innerHTML = recentHtml;
+
+  // Alerts: equipamentos com devolução próxima/vencida
+  const today = new Date(); today.setHours(0,0,0,0);
+  const in7 = new Date(today); in7.setDate(in7.getDate() + 7);
+  const alerts = cacheEquip
+    .filter(e => (e.status === "emprestado" || e.status === "demonstracao") && e.dataDevolucao)
+    .map(e => ({ ...e, dev: parseDate(e.dataDevolucao) }))
+    .filter(e => e.dev && e.dev <= in7)
+    .sort((a,b) => a.dev - b.dev);
+  if (alerts.length === 0) {
+    document.getElementById("alerts").innerHTML =
+      `<div style="color:var(--muted);font-size:13px">Nenhuma devolução pendente nos próximos 7 dias.</div>`;
+  } else {
+    document.getElementById("alerts").innerHTML = alerts.map(e => {
+      const overdue = e.dev < today;
+      return `<div class="recent-item">
+        <div>
+          <div class="who">${esc(e.nome)} <span class="mono" style="font-size:11px;color:var(--muted)">${esc(e.codigo)}</span></div>
+          <div class="what">${esc(e.projeto || "—")} · <span style="color:${overdue?'var(--danger)':'var(--warn)'};font-weight:600">${overdue?'VENCIDO':'Devolução em '+daysUntil(e.dev)+' dias'}</span></div>
+        </div>
+        <div class="when">${fmtDate(e.dataDevolucao)}</div>
+      </div>`;
+    }).join("");
+  }
+}
+
+/* ============ EQUIPAMENTOS ============ */
+document.getElementById("filterSearch").oninput = renderEquip;
+document.getElementById("filterStatus").onchange = renderEquip;
+
+function renderEquip() {
+  const search = document.getElementById("filterSearch").value.toLowerCase().trim();
+  const fStatus = document.getElementById("filterStatus").value;
+  const filtered = cacheEquip.filter(e => {
+    if (fStatus && e.status !== fStatus) return false;
+    if (search) {
+      const hay = `${e.nome} ${e.codigo} ${e.projeto||""}`.toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+  document.getElementById("equipCount").textContent = `${filtered.length} de ${cacheEquip.length}`;
+  document.getElementById("equipEmpty").style.display = filtered.length === 0 ? "block" : "none";
+
+  document.getElementById("equipBody").innerHTML = filtered.map(e => {
+    const period = e.dataRetirada && e.dataDevolucao
+      ? `${fmtDate(e.dataRetirada)} → ${fmtDate(e.dataDevolucao)}` : "—";
+    const canRequest = e.status === "disponivel";
+    return `<tr>
+      <td data-label="Equipamento"><strong>${esc(e.nome || "—")}</strong>${e.observacoes?`<br/><span style="font-size:11px;color:var(--muted)">${esc(truncate(e.observacoes,60))}</span>`:''}</td>
+      <td data-label="Código" class="code">${esc(e.codigo || "—")}</td>
+      <td data-label="Status"><span class="pill ${e.status}">${STATUS_LABELS[e.status]||e.status}</span></td>
+      <td data-label="Projeto / Oportunidade">${esc(e.projeto || "—")}</td>
+      <td data-label="Período">${period}</td>
+      <td class="actions">
+        ${canRequest ? `<button class="btn primary sm" data-act="request" data-id="${esc(e.id)}">Solicitar</button>` : ""}
+      </td>
+    </tr>`;
+  }).join("");
+
+  document.getElementById("equipBody").onclick = (ev) => {
+    const b = ev.target.closest("button[data-act='request']");
+    if (!b) return;
+    const e = cacheEquip.find(x => x.id === b.dataset.id);
+    if (e) openRequestModal(e);
+  };
+}
+
+document.getElementById("btnNewEquip").onclick = () => {
+  document.getElementById("eqName").value = "";
+  document.getElementById("eqCode").value = "";
+  document.getElementById("eqStatus").value = "disponivel";
+  document.getElementById("eqNotes").value = "";
+  openModal("modalEquip");
+};
+
+document.getElementById("btnSaveEquip").onclick = async () => {
+  const data = {
+    nome: document.getElementById("eqName").value.trim(),
+    codigo: document.getElementById("eqCode").value.trim(),
+    status: document.getElementById("eqStatus").value,
+    observacoes: document.getElementById("eqNotes").value.trim()
+  };
+  if (!data.nome || !data.codigo) return toast("Preencha nome e código.", "error");
+  const btn = document.getElementById("btnSaveEquip");
+  btn.disabled = true; btn.innerHTML = '<span class="loader"></span> Salvando…';
+  try {
+    await postAction("createEquip", data);
+    closeModal("modalEquip");
+    toast("Equipamento cadastrado.", "success");
+    await fetchData();
+  } catch (e) {
+    toast("Erro: " + e.message, "error");
+  } finally {
+    btn.disabled = false; btn.textContent = "Cadastrar";
+  }
+};
+
+/* ============ SOLICITAÇÕES ============ */
+let reqEquipRef = null;
+function openRequestModal(equip) {
+  reqEquipRef = equip;
+  document.getElementById("reqEquipInfo").innerHTML =
+    `<strong>${esc(equip.nome)}</strong> · <span class="mono">${esc(equip.codigo)}</span>`;
+  ["reqName","reqEmail","reqStart","reqEnd","reqProject","reqNotes"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("reqStatus").value = "emprestado";
+  openModal("modalReq");
+}
+
+document.getElementById("btnSendReq").onclick = async () => {
+  const data = {
+    equipamentoId: reqEquipRef.id,
+    equipamento: reqEquipRef.nome,
+    codigo: reqEquipRef.codigo,
+    solicitante: document.getElementById("reqName").value.trim(),
+    email: document.getElementById("reqEmail").value.trim(),
+    dataRetirada: document.getElementById("reqStart").value,
+    dataDevolucao: document.getElementById("reqEnd").value,
+    tipoUso: document.getElementById("reqStatus").value,
+    projeto: document.getElementById("reqProject").value.trim(),
+    observacoes: document.getElementById("reqNotes").value.trim()
+  };
+  if (!data.solicitante || !data.email || !data.dataRetirada || !data.dataDevolucao || !data.projeto)
+    return toast("Preencha todos os campos obrigatórios.", "error");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email))
+    return toast("E-mail inválido.", "error");
+  if (data.dataRetirada > data.dataDevolucao)
+    return toast("Data de devolução deve ser igual ou posterior à retirada.", "error");
+
+  const btn = document.getElementById("btnSendReq");
+  btn.disabled = true; btn.innerHTML = '<span class="loader"></span> Enviando…';
+  try {
+    await postAction("createRequest", data);
+    closeModal("modalReq");
+    toast("Solicitação enviada! Você receberá a resposta por e-mail.", "success");
+    await fetchData();
+  } catch (e) {
+    toast("Erro: " + e.message, "error");
+  } finally {
+    btn.disabled = false; btn.textContent = "Enviar para aprovação";
+  }
+};
+
+document.getElementById("filterReqStatus").onchange = renderRequests;
+function renderRequests() {
+  const f = document.getElementById("filterReqStatus").value;
+  const list = cacheReq.filter(r => !f || r.status === f);
+  document.getElementById("reqEmpty").style.display = list.length === 0 ? "block" : "none";
+  document.getElementById("reqBody").innerHTML = list.map(r => `
+    <tr>
+      <td data-label="Equipamento"><strong>${esc(r.equipamento)}</strong><br/><span class="code" style="font-size:11px">${esc(r.codigo)}</span></td>
+      <td data-label="Solicitante">${esc(r.solicitante)}<br/><span style="font-size:11px;color:var(--muted)">${esc(r.email)}</span></td>
+      <td data-label="Período">${fmtDate(r.dataRetirada)} → ${fmtDate(r.dataDevolucao)}</td>
+      <td data-label="Projeto">${esc(r.projeto || "—")}</td>
+      <td data-label="Status"><span class="pill ${r.status}">${REQ_STATUS_LABELS[r.status]||r.status}</span></td>
+      <td data-label="Data">${fmtDateTime(r.dataSolicitacao)}</td>
+    </tr>`).join("");
+}
+
+/* ============ MODAIS ============ */
+function openModal(id) { document.getElementById(id).classList.add("open"); }
+function closeModal(id) { document.getElementById(id).classList.remove("open"); }
+document.querySelectorAll(".modal-bg").forEach(bg => {
+  bg.addEventListener("click", (e) => {
+    if (e.target === bg || e.target.matches("[data-close]")) bg.classList.remove("open");
+  });
+});
+
+/* ============ UTILS ============ */
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function truncate(s, n) { s = String(s||""); return s.length > n ? s.slice(0,n) + "…" : s; }
+function parseDate(s) {
+  if (!s) return null;
+  if (s instanceof Date) return s;
+  const str = String(s);
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    const [y,m,d] = str.slice(0,10).split("-");
+    return new Date(+y, +m-1, +d);
+  }
+  const dt = new Date(str);
+  return isNaN(dt) ? null : dt;
+}
+function fmtDate(s) {
+  const d = parseDate(s);
+  return d ? d.toLocaleDateString("pt-BR") : "—";
+}
+function fmtDateTime(s) {
+  const d = parseDate(s);
+  if (!d) return "—";
+  return d.toLocaleString("pt-BR", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+}
+function daysUntil(d) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.round((d - today) / 86400000);
+}
+function toast(msg, kind) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = "toast show " + (kind || "");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove("show"), 3500);
+}
+
+/* ============ INIT ============ */
+fetchData();
+</script>
+
+</body>
+</html>
